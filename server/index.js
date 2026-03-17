@@ -5,13 +5,9 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/db');
-const cronJobs = require('./services/cronJobs');
 const { errorHandler } = require('./utils/errorHandler');
 
 const app = express();
-
-// Connect Database
-connectDB();
 
 // Security Middleware
 app.use(helmet());
@@ -68,8 +64,16 @@ app.use('/api/ai', require('./routes/ai'));
 app.use('/api/payment', require('./routes/payment'));
 
 // Health Check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/api/health', async (req, res) => {
+  try {
+    // Try to connect to DB if not connected
+    if (connectDB && typeof connectDB === 'function') {
+      await connectDB();
+    }
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  } catch (error) {
+    res.json({ status: 'degraded', error: error.message, timestamp: new Date().toISOString() });
+  }
 });
 
 // 404 Handler
@@ -84,12 +88,48 @@ app.use((req, res) => {
 // Global Error Handler (must be last)
 app.use(errorHandler);
 
-// Start Cron Jobs
-cronJobs.start();
-
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Galaxy Salon API running on port ${PORT}`);
-});
+
+// Only start server and cron jobs in non-serverless environment
+const isVercel = process.env.VERCEL === '1' || process.env.AWS_LAMBDA_FUNCTION_NAME;
+
+if (!isVercel) {
+  // Connect Database (for local/railway deployment)
+  connectDB();
+  
+  // Start Cron Jobs (only for non-serverless)
+  try {
+    const cronJobs = require('./services/cronJobs');
+    cronJobs.start();
+  } catch (err) {
+    console.log('[CRON] Cron jobs disabled in this environment');
+  }
+  
+  app.listen(PORT, () => {
+    console.log(`Galaxy Salon API running on port ${PORT}`);
+  });
+}
 
 module.exports = app;
+
+// Vercel serverless handler
+export default async function handler(req, res) {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Credentials', true);
+    res.setHeader('Access-Control-Allow-Origin', process.env.CLIENT_URL || '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization,X-Requested-With,Content-Type');
+    return res.status(200).json({});
+  }
+
+  // Connect to database lazily for serverless
+  try {
+    await connectDB();
+  } catch (err) {
+    console.error('Database connection error:', err.message);
+  }
+  
+  // Let Express handle the request
+  return app(req, res);
+};
