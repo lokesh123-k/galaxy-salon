@@ -111,6 +111,10 @@ const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
   try {
+    // Debug: Check environment variables
+    console.log('[DEBUG] MONGODB_URI set:', !!process.env.MONGODB_URI);
+    console.log('[DEBUG] RAILWAY:', process.env.RAILWAY ? 'YES' : 'NO');
+    
     if (!process.env.MONGODB_URI) {
       console.error("❌ MONGODB_URI is missing");
       process.exit(1);
