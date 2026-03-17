@@ -113,9 +113,13 @@ const isVercel = process.env.VERCEL === '1' ||
                   process.env.AWS_LAMBDA_FUNCTION_NAME !== undefined ||
                   process.env.VERCEL_ENV !== undefined;
 
+// Railway detection - Railway sets PORT environment variable and has RAILWAY_ENVIRONMENT
+const isRailway = process.env.RAILWAY_ENVIRONMENT !== undefined || 
+                   process.env.RAILWAY_PROJECT_NAME !== undefined;
+
 // Also check if we should use serverless mode based on environment
-// If NODE_ENV is production and no local port is specified, assume serverless
-const isServerlessMode = isVercel || (process.env.NODE_ENV === 'production' && !process.env.LOCAL_DEV);
+// Only use serverless mode on Vercel, NOT on Railway (Railway runs persistent containers)
+const isServerlessMode = isVercel;
 
 if (!isServerlessMode) {
   // Connect Database (for local/railway deployment)
@@ -134,7 +138,11 @@ if (!isServerlessMode) {
   }
   
   app.listen(PORT, () => {
-    console.log(`Galaxy Salon API running on port ${PORT}`);
+    if (isRailway) {
+      console.log(`Galaxy Salon API running on Railway - Port: ${PORT}`);
+    } else {
+      console.log(`Galaxy Salon API running on port ${PORT}`);
+    }
   });
 } else {
   console.log('[SERVERLESS] Running in serverless mode - skipping server listen and cron jobs');
@@ -143,7 +151,7 @@ if (!isServerlessMode) {
 module.exports = app;
 
 // Vercel serverless handler
-export default async function handler(req, res) {
+const handler = async (req, res) => {
   console.log('[Vercel] Request received:', req.method, req.url);
   
   // Handle CORS preflight
@@ -176,3 +184,6 @@ export default async function handler(req, res) {
   // Let Express handle the request
   return app(req, res);
 };
+
+// Export for Vercel serverless
+module.exports.handler = handler;

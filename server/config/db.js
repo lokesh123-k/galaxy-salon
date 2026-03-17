@@ -6,7 +6,11 @@ const dns = require('dns');
 const isServerless = process.env.VERCEL === '1' || 
                      process.env.AWS_LAMBDA_FUNCTION_NAME !== undefined;
 
-if (!isServerless) {
+// Railway also needs custom DNS for MongoDB Atlas SRV records
+const isRailway = process.env.RAILWAY_ENVIRONMENT !== undefined || 
+                   process.env.RAILWAY_PROJECT_NAME !== undefined;
+
+if (!isServerless || isRailway) {
   dns.setServers(['8.8.8.8', '8.8.4.4']);
 }
 
