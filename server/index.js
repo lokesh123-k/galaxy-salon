@@ -1,9 +1,11 @@
 require('dotenv').config({ path: __dirname + '/.env' });
 
-// Debug: Log environment variables (remove in production)
-console.log('[DEBUG] MONGODB_URI:', process.env.MONGODB_URI ? 'set' : 'NOT SET');
-console.log('[DEBUG] NODE_ENV:', process.env.NODE_ENV);
-console.log('[DEBUG] VERCEL:', process.env.VERCEL);
+// Debug: Log environment variables in development only
+if (process.env.NODE_ENV !== 'production') {
+  console.log('[DEBUG] MONGODB_URI:', process.env.MONGODB_URI ? 'set' : 'NOT SET');
+  console.log('[DEBUG] NODE_ENV:', process.env.NODE_ENV);
+  console.log('[DEBUG] VERCEL:', process.env.VERCEL);
+}
 
 const express = require('express');
 const cors = require('cors');
@@ -146,8 +148,12 @@ export default async function handler(req, res) {
   
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
+    // Secure CORS - use specific origin or deny in production
+    const allowedOrigin = process.env.CLIENT_URL || 
+      (process.env.VERCEL_ENV === 'production' ? null : '*');
+    
     res.setHeader('Access-Control-Allow-Credentials', true);
-    res.setHeader('Access-Control-Allow-Origin', process.env.CLIENT_URL || '*');
+    res.setHeader('Access-Control-Allow-Origin', allowedOrigin || 'https://your-domain.vercel.app');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
     res.setHeader('Access-Control-Allow-Headers', 'Authorization,X-Requested-With,Content-Type');
     return res.status(200).json({});
@@ -164,6 +170,7 @@ export default async function handler(req, res) {
     await connectDB();
   } catch (err) {
     console.error('[Vercel] Database connection error:', err.message);
+    return res.status(503).json({ error: 'Database unavailable. Please try again later.' });
   }
   
   // Let Express handle the request

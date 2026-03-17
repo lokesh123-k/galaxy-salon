@@ -1,8 +1,14 @@
 const mongoose = require('mongoose');
 const dns = require('dns');
 
-// Use Google DNS to resolve Atlas SRV records (fixes ECONNREFUSED on some networks)
-dns.setServers(['8.8.8.8', '8.8.4.4']);
+// Use Google DNS only in non-serverless environments (local/railway)
+// Vercel has its own DNS configuration
+const isServerless = process.env.VERCEL === '1' || 
+                     process.env.AWS_LAMBDA_FUNCTION_NAME !== undefined;
+
+if (!isServerless) {
+  dns.setServers(['8.8.8.8', '8.8.4.4']);
+}
 
 // Track connection state for serverless
 let isConnected = false;
