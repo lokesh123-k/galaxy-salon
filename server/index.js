@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: __dirname + '/.env' });
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -65,6 +65,15 @@ app.use('/api/payment', require('./routes/payment'));
 
 // Health Check
 app.get('/api/health', async (req, res) => {
+  // Check if MONGODB_URI is configured
+  if (!process.env.MONGODB_URI) {
+    return res.status(503).json({ 
+      status: 'error', 
+      error: 'MONGODB_URI not configured',
+      timestamp: new Date().toISOString() 
+    });
+  }
+  
   try {
     // Try to connect to DB if not connected
     if (connectDB && typeof connectDB === 'function') {
@@ -72,7 +81,7 @@ app.get('/api/health', async (req, res) => {
     }
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   } catch (error) {
-    res.json({ status: 'degraded', error: error.message, timestamp: new Date().toISOString() });
+    res.status(503).json({ status: 'degraded', error: error.message, timestamp: new Date().toISOString() });
   }
 });
 
@@ -114,6 +123,8 @@ module.exports = app;
 
 // Vercel serverless handler
 export default async function handler(req, res) {
+  console.log('[Vercel] Request received:', req.method, req.url);
+  
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Credentials', true);
@@ -123,11 +134,17 @@ export default async function handler(req, res) {
     return res.status(200).json({});
   }
 
+  // Check if environment is configured
+  if (!process.env.MONGODB_URI) {
+    console.error('[Vercel] MONGODB_URI not configured');
+    return res.status(500).json({ error: 'Server misconfiguration: MONGODB_URI not set' });
+  }
+
   // Connect to database lazily for serverless
   try {
     await connectDB();
   } catch (err) {
-    console.error('Database connection error:', err.message);
+    console.error('[Vercel] Database connection error:', err.message);
   }
   
   // Let Express handle the request

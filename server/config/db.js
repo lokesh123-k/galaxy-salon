@@ -8,6 +8,11 @@ dns.setServers(['8.8.8.8', '8.8.4.4']);
 let isConnected = false;
 
 const connectDB = async () => {
+  // Check if MONGODB_URI is set
+  if (!process.env.MONGODB_URI) {
+    throw new Error('MONGODB_URI environment variable is not set');
+  }
+  
   // If already connected, skip connection attempt (for serverless warm invocations)
   if (isConnected && mongoose.connection.readyState === 1) {
     return mongoose.connection;
