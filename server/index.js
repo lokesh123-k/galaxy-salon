@@ -106,7 +106,7 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 
 // Check if running on Vercel (serverless) or local/railway
-const isVercel = process.env.VERCEL === '1' || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NODE_ENV === 'production';
+const isVercel = process.env.VERCEL === '1' || process.env.AWS_LAMBDA_FUNCTION_NAME;
 
 if (!isVercel) {
   // Connect Database (for local/railway deployment)
