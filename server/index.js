@@ -1,4 +1,10 @@
 require('dotenv').config({ path: __dirname + '/.env' });
+
+// Debug: Log environment variables (remove in production)
+console.log('[DEBUG] MONGODB_URI:', process.env.MONGODB_URI ? 'set' : 'NOT SET');
+console.log('[DEBUG] NODE_ENV:', process.env.NODE_ENV);
+console.log('[DEBUG] VERCEL:', process.env.VERCEL);
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -99,12 +105,16 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-// Only start server and cron jobs in non-serverless environment
-const isVercel = process.env.VERCEL === '1' || process.env.AWS_LAMBDA_FUNCTION_NAME;
+// Check if running on Vercel (serverless) or local/railway
+const isVercel = process.env.VERCEL === '1' || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NODE_ENV === 'production';
 
 if (!isVercel) {
   // Connect Database (for local/railway deployment)
-  connectDB();
+  try {
+    connectDB();
+  } catch (err) {
+    console.error('Database connection failed:', err.message);
+  }
   
   // Start Cron Jobs (only for non-serverless)
   try {
@@ -117,6 +127,8 @@ if (!isVercel) {
   app.listen(PORT, () => {
     console.log(`Galaxy Salon API running on port ${PORT}`);
   });
+} else {
+  console.log('[VERCEL] Running in serverless mode - skipping server listen and cron jobs');
 }
 
 module.exports = app;
