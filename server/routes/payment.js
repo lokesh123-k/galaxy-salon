@@ -4,15 +4,29 @@ const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const { auth } = require('../middleware/auth');
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
+// Lazy initialize Razorpay only when credentials are available
+let razorpay = null;
+
+const getRazorpay = () => {
+  if (!razorpay && process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
+    razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
+  }
+  return razorpay;
+};
 
 // @route   POST /api/payment/create-order
 // @desc    Create a Razorpay order
 router.post('/create-order', auth, async (req, res) => {
   try {
+    // Check if Razorpay is configured
+    const rp = getRazorpay();
+    if (!rp) {
+      return res.status(503).json({ error: 'Payment service not configured. Please set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.' });
+    }
+
     const { amount } = req.body;
 
     if (!amount || amount <= 0) {
@@ -25,7 +39,7 @@ router.post('/create-order', auth, async (req, res) => {
       receipt: `rcpt_${Date.now()}`,
     };
 
-    const order = await razorpay.orders.create(options);
+    const order = await rp.orders.create(options);
     res.json({
       orderId: order.id,
       amount: order.amount,
@@ -42,6 +56,11 @@ router.post('/create-order', auth, async (req, res) => {
 // @desc    Verify Razorpay payment signature
 router.post('/verify', auth, async (req, res) => {
   try {
+    // Check if Razorpay is configured
+    if (!process.env.RAZORPAY_KEY_SECRET) {
+      return res.status(503).json({ error: 'Payment service not configured. Please set RAZORPAY_KEY_SECRET.' });
+    }
+
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
