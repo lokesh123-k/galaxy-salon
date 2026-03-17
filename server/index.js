@@ -123,10 +123,15 @@ const isServerlessMode = isVercel;
 
 if (!isServerlessMode) {
   // Connect Database (for local/railway deployment)
-  try {
-    connectDB();
-  } catch (err) {
-    console.error('Database connection failed:', err.message);
+  // Only attempt if MONGODB_URI is set
+  if (process.env.MONGODB_URI) {
+    try {
+      connectDB();
+    } catch (err) {
+      console.error('Database connection failed:', err.message);
+    }
+  } else {
+    console.log('[DB] MONGODB_URI not set - running without database');
   }
   
   // Start Cron Jobs (only for non-serverless)
