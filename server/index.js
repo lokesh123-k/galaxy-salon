@@ -106,9 +106,16 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 
 // Check if running on Vercel (serverless) or local/railway
-const isVercel = process.env.VERCEL === '1' || process.env.AWS_LAMBDA_FUNCTION_NAME;
+// Use multiple detection methods
+const isVercel = process.env.VERCEL === '1' || 
+                  process.env.AWS_LAMBDA_FUNCTION_NAME !== undefined ||
+                  process.env.VERCEL_ENV !== undefined;
 
-if (!isVercel) {
+// Also check if we should use serverless mode based on environment
+// If NODE_ENV is production and no local port is specified, assume serverless
+const isServerlessMode = isVercel || (process.env.NODE_ENV === 'production' && !process.env.LOCAL_DEV);
+
+if (!isServerlessMode) {
   // Connect Database (for local/railway deployment)
   try {
     connectDB();
@@ -128,7 +135,7 @@ if (!isVercel) {
     console.log(`Galaxy Salon API running on port ${PORT}`);
   });
 } else {
-  console.log('[VERCEL] Running in serverless mode - skipping server listen and cron jobs');
+  console.log('[SERVERLESS] Running in serverless mode - skipping server listen and cron jobs');
 }
 
 module.exports = app;
